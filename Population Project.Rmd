@@ -1,0 +1,899 @@
+---
+title: "Population Project"
+author: "María Cristina Carmona Fernández"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: 6
+    number_sections: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: no
+  word_document:
+    toc: yes
+    toc_depth: '6'
+  pdf_document: default
+---
+
+In this project, a database containing the health status, as well as many other related factors, for all countries will be analyzed.
+
+Firstly, an initial *exploratory analysis* of the data will be conducted to identify potential *missing values* and *outliers*, and corresponding decisions will be made to address them.
+
+Secondly, a *Principal Component Analysis (PCA)* will be performed. This involves condensing the information provided by the original variables into a few linear combinations, aiming to achieve dimensionality reduction. These combinations seek maximum variance and are perpendicular to each other, capturing the directions in which observations vary the most and are uncorrelated with each other.
+
+Thirdly, a *Factor Analysis (FA)* will be carried out, where latent variables (unobservable) with a high correlation to a group of observable variables and virtually no correlation with the rest will be identified. This results in further dimensionality reduction.
+
+Finally, *Linear Discriminant Analysis (LDA)* and *Quadratic Discriminant Analysis (QDA)* will be conducted, verifying the necessary assumptions of normality. Discriminant Analysis is a method for classifying qualitative variables, allowing the classification of new observations based on their characteristics (explanatory or predictor variables) into different categories of the qualitative response variable.
+
+# **Loading packages and the dataset**
+
+Loading/installation of R packages necessary for this practice.
+
+```{r warning=FALSE, message=FALSE}
+#install.packages("readr")
+#Package required to call the 'read.csv' function.
+library(readr)
+
+#install.packages("pastecs")
+#Package required to call the 'stat.desc' function.
+library(pastecs)
+
+#install.packages("summarytools") 
+#Package required to call the 'freq' function.
+library(summarytools)
+
+#install.packages("MASS")
+#Package required to call the 'lda' function.
+library(MASS)
+
+#install.packages("psych")
+#Package required to call the 'cortest.bartlett' function.
+library(psych)
+
+#install.packages("polycor")
+#Package required to call the 'hetcor' function.
+library(polycor)
+
+#install.packages("ggcorrplot")
+#Package required to call the 'ggcorrplot' function.
+library(ggcorrplot)
+
+#install.packages("corrplot")
+#Package required to call the 'corrplot' function.
+library(corrplot)
+
+#install.packages("ggplot2")
+#Package required to call the 'ggplot' function.
+library(ggplot2)
+
+#install.packages("stats")
+#Package required to call the 'factanal' function.
+library(stats)
+
+#install.packages("ggpubr")
+#Package required to call 'ggarrange' function.
+library(ggpubr)
+
+#install.packages("reshape2")
+# Package required to call 'melt' function.
+library(reshape2)
+
+#install.packages("biotools")
+#Package required to call 'boxM' function.
+library(biotools)
+
+#install.packages("energy")
+#Package required to call 'mvnorm.etest' function.
+library(energy)
+
+#install.packages("MVN")
+#Package required to call 'mvn' function.
+library(MVN)
+
+#install.packages("klaR")
+#Package required to call 'partimat' function.
+library(klaR)
+```
+
+
+## Description of the dataset
+
+The dataset is taken from the Global Health Observatory (GHO) data repository under World Health Organization (WHO) keeps track of the health status as well as many other related factors for all countries. The data is from year 2000-2015 for 193 countries. It contains the following variables:
+
+- Country: Country Name.
+- Year: Year.
+- Status: Developed or Developing.
+- Life Expectancy: Life expectancy in age.
+- Adult Mortality: Probability of dying between 15 and 60 years per 1000 population.
+- Infant Deaths: Number of infant deaths per 1000 population.
+- Alcohol: Recorded per capita consumption (in litres).
+- Percentage Expenditure: Expenditure on health as per GDP (%).
+- Hepatitis B: Immunization coverage among 1-year-olds (%).
+- Measles: Number of reported cases per 1000 population.
+- BMI: Average BMI of the entire population.
+- Under-Five Deaths: Number of under-five deaths per 1000 population.
+- Polio Immunization: Coverage among one-year-olds (%).
+- Total Expenditure: Government expenditure on health as a percentage of total government expenditure (%).
+- Diphtheria: Immunization coverage among one-year-olds (%).
+- HIV/AIDS: Deaths per 1000 population.
+- GDP: Gross Domestic Product (GDP) per capita (USD).
+- Population: Population of the country.
+- Thinness 10-19 Years: Thinness among children from age 10-19 (%).
+- Thinness 5-9 Years: Thinness among children from age 5-9 (%).
+- Resource Income: Index ranging from 0-1.
+- Schooling: Number of years of schooling.
+
+The aim is to identify how those factors affect life expectancy, such factors being demographic variables, income composition, mortality rates, immunization, human development index, social and economic factors.
+
+## Loading the dataset
+
+To load our data set we will use the function *read.csv*.
+
+```{r warning=FALSE, message=FALSE}
+#Set a CRAN mirror.
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+
+#Loading the data set, expect.
+expect<-read_csv("LED.csv")
+nuevos_nombres <- c("Country", "Year", "Status", "Life expectancy", "Adult Mortality", "infant deaths", "Alcohol", "percentage expenditure", "Hepatitis B", "Measles", "BMI", "under-five deaths", "Polio", "Total expenditure", "Diphtheria", "HIV/AIDS", "GDP", "Population", "thinness  1-19 years", "thinness 5-9 years", "Resource Income", "Schooling")
+names(expect) <- nuevos_nombres
+class(expect) #it is a data frame.
+colnames(expect) #to view the different variables previously mentioned.
+```
+
+
+# **Preliminary exploratory analysis of the data**
+
+## Identification and treatment of missing values (NA).
+
+Now we identify the NA values and create a vector with the variables that have more than 5% of NA. For that we create a function called *percentageNA* and we use an *apply* function to apply it to the data frame
+
+
+```{r warning=FALSE, message=FALSE}
+#We create a function to know which variables have more than 5% missing values.
+percentageNA<-function(data){
+  c=(sum(is.na(data)))/length(data)*100
+  return(c)
+}
+
+#Next, we apply the previous function to our dataframe.
+contNA<-apply(expect,2,percentageNA)
+contNA
+
+
+#Now, we group the variables with more than 5% missing values.
+missing_percentage <- colMeans(is.na(expect))
+variables_with_missing <- missing_percentage[missing_percentage > 0.05]
+variables_with_missing
+```
+
+As we can see, the variables with more than 5% of missing values are Alcohol, Hepatitis B, Total expenditure, GDP, Population, Resource Income and Schooling. 
+
+Then, we see which of them are numeric.
+
+```{r warning=FALSE, message=FALSE}
+is_numeric_vector <- sapply(variables_with_missing, is.numeric)
+is_numeric_vector
+```
+
+All of the variables with missing values are numeric. Of the variables that have more than 5% missing values we will analyze whether they follow a random pattern. To do this, we'll study homogeneity according to groups (NA and non-NA) with other variables. To assess whether the means of the variable in the NA group and the non-NA group are significantly different, we'll perform a statistical test, the Student's t-test is commonly used for this purpos and it's the one we will use as our variables are continuous.
+
+Firstly, we'll define new variables that take the value of 0 if the corresponding data is not missing and the value of 1 if the corresponding data is missing. 
+
+Subsequently, a test of the equality of means is conducted between the groups of variable *Measles* (which has no missing values) corresponding to 0 and 1 of these new variables.
+
+```{r warning=FALSE, message=FALSE}
+
+#Defining a function to create the new variables.
+indicadoraNA<-function(data,na.rm=F){
+  data[!is.na(data)]<-0
+  data[is.na(data)]<-1
+  return(data)
+}
+
+#Preparing to perform the test, we use the previous function.
+alcoholNA=indicadoraNA(expect$Alcohol)
+hepBNA=indicadoraNA(expect$`Hepatitis B`) 
+totalexpNA=indicadoraNA(expect$`Total expenditure`)
+gdpNA=indicadoraNA(expect$GDP)
+populationNA=indicadoraNA(expect$Population)
+incomeNA=indicadoraNA(expect$`Resource Income`)
+schoolingNA=indicadoraNA(expect$Schooling)
+
+#Student's t test.
+t.test(expect$Measles~alcoholNA, var.equal=TRUE)
+t.test(expect$Measles~hepBNA, var.equal=TRUE)
+t.test(expect$Measles~totalexpNA, var.equal=TRUE)
+t.test(expect$Measles~gdpNA, var.equal=TRUE)
+t.test(expect$Measles~populationNA, var.equal=TRUE)
+t.test(expect$Measles~incomeNA, var.equal=TRUE)
+t.test(expect$Measles~schoolingNA, var.equal=TRUE)
+```
+
+Now we would examine the p-value in each case.
+
+For the variables Alcohol, Total expenditure, GDP and Population p > 0.15, then there is no evidence to reject the null hypothesis of equal means. Therefore, the hypothesis of homogeneity is accepted, and it is concluded that the pattern is random. In the case of homogeneity the pattern is random and, in this case, it is chosen to
+replace the NA with the mean.
+
+For the remaining variables that we are studying, which are Hepatitis B, Resource Income and Schooling, p < 0.15, so homogeneity cannot be assumed. In this case,this would have to be discussed with the researcher who poses the problem under analysis because they should neither be eliminated nor replaced, but since in this case it is not feasible,
+it is decided to act as in the case of a random pattern, so in this case, we replace them with the median.
+
+In this case, since the variables are quantitative, missing values are replaced with the mean of the non-missing values.
+
+
+```{r warning=FALSE, message=FALSE}
+# Define a function to replace NAs with the mean of each column. Creating the function that handles the missing values.
+replace_na_with_mean <- function(column) {
+  mean_value <- mean(column, na.rm = TRUE)
+  column[is.na(column)] <- mean_value
+  return(column)
+}
+
+# Apply the replacement function to each column of 'expect'.
+expect_imputed <- as.data.frame(lapply(expect, replace_na_with_mean))
+```
+
+## Classical numeric descriptive analysis
+
+Now we do Classical numeric descriptive analysis (measures of central tendency, dispersion, quantiles, symmetry, kurtosis, etc.). As we know the only qualitative variables are *country* and *status*, so will analyze those one separately later.
+
+First, we'll do the quantitative ones. The *stat.desc* function from the `pastecs` package provides the most important measures of position, dispersion, and shape:
+
+- Number of values (nbr.val).
+- Number of null values (nbr.null).
+- Number of missing values (nbr.na).
+- Minimum value of the variable (min).
+- Maximum value of the variable (max).
+- Range of variable values (max-min) (range).
+- Sum of non-missing values (sum).
+- Median (median).
+- Mean (mean).
+- Standard error of the mean (SE.mean).
+- Confidence interval of the mean (CI.mean).
+- Variance (var).
+- Standard deviation (std.dev).
+- Coefficient of variation (coef.var).
+- Skewness coefficient (skewness).
+- Statistic to test if the skewness coefficient is zero (skew.2SE).
+- Kurtosis coefficient (kurtosis).
+- Statistic to test if the kurtosis coefficient is zero (kurt.2SE).
+- Shapiro-Wilks statistic (normtest.W).
+- Probability associated with the Shapiro-Wilks statistic (normtest.p).
+
+```{r warning=FALSE, message=FALSE}
+
+#We care for the quantitative variables.
+#We create a dataframe 'expect_num' where the NA have been substituted by the mean and the qualitative variables have been removed.
+expect_num <- subset(expect_imputed, select = -c(Country, Status))
+
+
+#Now we study the statistics with the function 'stat.desc'.
+pastecs_stats <- stat.desc(expect_num) 
+pastecs_stats
+```
+
+As this function doesn't provide us with the quantiles we'll use the function *summary*:
+
+```{r warning=FALSE, message=FALSE}
+summary(expect_num)
+```
+
+Now we care for the qualitative variables:
+
+```{r warning=FALSE, message=FALSE}
+freq(expect_imputed$Country)
+freq(expect_imputed$Status)
+```
+
+In the variable *Country* we can observe that a smaller sample has been taken for some countries, which are: Cook Islands, Dominica, Marshall Islands, Monaco, Nauru, Nive, Palau, Saint Kitts and Nevis, San Marino and Tuvalu. This is made as these countries have a smaller population. 
+
+## Extreme values (outliers)
+
+To detect outliers, a preliminary exploratory analysis is required by constructing boxplots for all variables. The following visualization is not the best due to the difference between the scales.
+
+```{r warning=FALSE, message=FALSE}
+boxplot(expect_num[-1],main="Outliers",
+        xlab="All explanatory variables",
+        ylab="Values",
+        col=c(1:11),
+        las = 2)
+```
+
+The following visualization is not affected by the difference between the scales as if the quantitative variables are standardized, the effect of scales differences is erased
+
+```{r warning=FALSE, message=FALSE}
+sca<-scale(expect_num[-1])
+boxplot(sca,main="Outliers",
+        xlab="All explanatory variables",
+        ylab="Values",
+        col=c(1:11))
+```
+
+As we can see there are many outliers, so we could not eliminate them. We'll have to substitute them for the mean.
+
+Since all variables are quantitative, the decision has been made to replace them with the mean. To achieve this, the "outlier" function has been developed to perform the detection and manipulation of outliers. It is worth noting that the decision to replace outliers with the mean would necessitate a prior analysis of the cause of these outlier values.
+
+
+```{r warning=FALSE, message=FALSE}
+#Defining the outlier function.
+outlier<-function(data,na.rm=T){
+  H<-1.5*IQR(data, na.rm=T)
+  data[data<quantile(data,0.25, na.rm = T)-H]<-NA
+  data[data>quantile(data,0.75, na.rm = T)+H]<-NA
+  data[is.na(data)]<-mean(data, na.rm = T)
+
+  H<-1.5*IQR(data)
+
+  if (TRUE %in% (data<quantile(data,0.25,na.rm = T)-H) |
+      TRUE %in% (data>quantile(data,0.75,na.rm = T)+H))
+    outlier(data)
+  else
+    return(data)
+}
+
+# Application of the outlier function to substitute the outliers for the mean.
+data<-as.data.frame(apply(expect_num,2,outlier))
+
+# Lastly, a comparison between the original data and the corrected data with the respective boxplots.
+par(mfrow=c(1,2))
+
+# Boxplot of the original data.
+boxplot(expect_num,main="Original data",
+        xlab="Explanatory variables",
+        ylab="Values",
+        col=c(1:ncol(expect_num)))
+
+# Boxplot of the corrected data.
+boxplot(data,main="Data without outliers",
+        xlab="Explanatory variables",
+        ylab="Values",
+        col=c(1:ncol(data)))
+```
+
+As we can see, the data is not scaled, so now we'll see the boxplots with scaled data.
+
+```{r warning=FALSE, message=FALSE}
+#We apply the function to substitute the outliers.
+data_norm<-as.data.frame(apply(sca,2,outlier))
+
+#Lastly, a comparison between the original data and the corrected data with the respective boxplots.
+par(mfrow=c(1,2))
+
+# Boxplot of the original data.
+boxplot(sca,main="Original data",
+        xlab="Explanatory variables",
+        ylab="Values",
+        col=c(1:ncol(expect_num)))
+
+# Boxplot of the corrected data.
+boxplot(data_norm,main="Data without outliers",
+        xlab="Explanatory variables",
+        ylab="Values",
+        col=c(1:ncol(expect_num)))
+```
+
+# **Principal Component Analysis (PCA)**
+
+First, it is necessary to verify that the variables are not independent:
+
+-At the level of the sample collected in the database, this can be done by calculating and observing the correlation matrix.
+
+-At a population level, it will be justified that there is a correlation using 'Bartlett's Test of sphericity'. This test checks if the correlations are significantly different from 0.The null hypothesis is H_0: det(R) = 1; it means that the variables are not correlated, R denotes the correlation matrix. This function works with standardized data.
+
+```{r warning=FALSE, message=FALSE}
+#Correlation matrix.
+correlation_matrix<- cor(data)
+correlation_matrix
+
+#Standardized data.
+data_scaled<- scale(data)
+
+#Bartlett's Test of sphericity.
+cortest.bartlett(cor(data_scaled))
+```
+
+1. **$chisq**: This value represents the chi-square statistic obtained from 'Bartlett's test of sphericity'. It measures the discrepancy between the observed correlation matrix and an identity matrix, i.e., a matrix in which all variables are uncorrelated. It is a measure of how much the observed correlations deviate from the expected correlations if the variables were uncorrelated; thus, a large value indicates that the variables are correlated.
+
+2. **$p.value**: This is the p-value associated with the chi-square statistic. It indicates the probability of obtaining a chi-square statistic as extreme as the calculated one (or more extreme) if the variables were truly uncorrelated. Since the p-value is extremely small, it provides strong evidence against the null hypothesis that the variables are not correlated. The null hypothesis is rejected, meaning that *det(R) = 1*; hence *det(R) != 1*.
+
+3. **$df**: These are the degrees of freedom associated with the chi-square statistic, in this case, they are 190.
+
+After this, it is requested to carry out a study of the possibility of reducing the dimension through observable variables. It is convenient to choose the optimal number of principal components using different graphical techniques.
+
+Firstly, we'll study the polychoric  correlation matrix.
+
+```{r warning=FALSE, message=FALSE}
+poly_cor<- hetcor(expect_num)$correlations
+ggcorrplot(poly_cor, type="lower",hc.order=T,  tl.cex = 10)
+```
+
+A polychoric correlation matrix evaluates the relationships between two or more variables. This matrix quantifies the relationship between pairs of variables and provides a measure of how these variables tend to move together or in opposite directions. Polychoric correlation values range from -1 to 1.
+
+A positive value indicates a positive relationship, meaning that as the values of one variable increase, the values of the other tend to increase. Conversely, a negative value suggests a negative relationship, where an increase in the values of one variable is associated with a decrease in the values of the other. When the value approaches 0, it indicates a weak relationship between the variables. The magnitude of the value reflects the strength of the observed association. In this case, as the relationship takes on a redder hue, it indicates a more direct correlation between the variables. On the other hand, as it becomes bluer, it suggests a stronger negative correlation. When the color approaches white, it indicates that the variables have a weaker relationship.
+
+```{r warning=FALSE, message=FALSE}
+#Another interesting representation would be the following one.
+corrplot(correlation_matrix, order = "hclust", tl.col='black', tl.cex=0.7)
+```
+
+This is a graphical representation of the correlation matrix. The Pearson correlation matrix is computed for the data in our dataset, meaning pairwise correlations are calculated between all variables in the dataset, yielding a square correlation matrix. Positive correlations are depicted by an intense blue color, which is why the diagonal of the matrix is blue since all variables are entirely correlated with themselves. Negative correlations are indicated by an intense red color.
+
+Observing the graphical representations, it appears that there are between 4 and 5 groups of latent variables highly correlated with one group of observable variables and weakly correlated with the rest. This provides an intuitive sense of the optimal number of factors for our Factor Analysis.
+
+Based on the results obtained in the previous sections, we are ready to perform dimensionality reduction using Principal Component Analysis (PCA) or Factor Analysis, as the data is correlated, contains no missing values, and the presence of outliers has been avoided.
+
+## Implementation of Principal Component Analysis (PCA)
+
+The following code performs PCA, obtaining the eigenvectors that generate each component, as well as their eigenvalues, which correspond to the variance of each component.
+
+```{r warning=FALSE, message=FALSE}
+#Using prcomp to compute the principal components (eigenvalues and eigenvectors). 
+#With scale=TRUE, variable means are set to zero, and variances set to one.
+expect_pca <- prcomp(data,scale=TRUE)
+
+#The "rotation" field of the "expect_pca" object is a matrix whose columns
+#are the coefficients of the principal components, i.e., the
+#weight of each variable in the corresponding principal component.
+expect_pca$rotation
+
+#In the "sdev" field of the "expect_pca" object, along with the summary function applied
+#to the object, relevant information is obtained: standard deviations of
+#each principal component, proportion of explained and cumulative variance.
+expect_pca$sdev
+
+summary(expect_pca)
+```
+
+The following code explains the behaviour of the explained variance for each principal component and the behaviour of the cumulative explained variance.
+
+```{r warning=FALSE, message=FALSE}
+eigen_expect <- expect_pca$sdev^2
+
+names(eigen_expect) <- paste("PC",1:20,sep="")
+eigen_expect
+
+sumlambdas <- sum(eigen_expect)
+sumlambdas
+
+#shows the percent variance each principal component holds
+propvar <- eigen_expect/sumlambdas
+propvar 
+
+#shows the cumulative percent variance 
+percent <- cumsum(propvar)
+percent 
+```
+
+The following graphs explain the behaviour of the explained variance for each principal component and the behaviour of the cumulative explained variance.
+
+```{r warning=FALSE, message=FALSE}
+#Proportion of the explained variance.
+expl_var <- expect_pca$sdev^2 / sum(expect_pca$sdev^2)
+
+ggplot(data = data.frame(expl_var, pc = 1:ncol(data)),
+       aes(x = pc, y = expl_var, fill=expl_var )) +
+  geom_col(width = 0.3) +
+  scale_y_continuous(limits = c(0,0.6)) + theme_bw() +
+  labs(x = "Principal component", y = "Proportion of explained variance")
+```
+
+```{r warning=FALSE, message=FALSE}
+#Proportion of the cumulative explained variance.
+var_cum<-cumsum(expl_var)
+
+ggplot( data = data.frame(var_cum, pc = 1:ncol(data)),
+        aes(x = pc, y = var_cum ,fill=var_cum )) +
+  geom_col(width = 0.5) +
+  scale_y_continuous(limits = c(0,1)) +
+  theme_bw() +
+  labs(x = "Principal component", y = "Proportion of cumulative explained variance")
+```
+
+To choose the appropriate number of principal components, the following method is used: The variances explained by the principal components are averaged, and those whose proportion of explained variance exceeds the mean are selected.
+
+```{r warning=FALSE, message=FALSE}
+expect_pca$sdev^2
+mean(expect_pca$sdev^2)
+```
+
+This analysis recommends taking 6 as the optimal number of principal components. It is necessary that we only retain enough components to explain a specified significantly large percentage of the total variance in the original variables.Typically, values between 70% and 90% are suggested, although lower values may be appropriate as the sample size increases. As this dataset has almost 3000 observations, it is safe to choose 6 principal components because it represents nearly 70% (67.3828705%) of the total variance. If a higher percentage is desired, one could opt for 7 variables -as PC7's proportion of explained variance is really close to the mean- resulting in a percentage of 71.8895108%."
+
+Now having chosen the optimal number of principal components, we'll perform a reduction of the dimension via factor analysis.
+
+# **Factor analysis**
+
+## Different estimation methods
+
+A method for extracting factors should be chosen, such as the principal factor, maximum likelihood, etc. The *fa()* function implements up to 6 different methods. This example compares the results of two methods.
+
+First, two models with three factors each are created. The factor matrix for three latent factors in the two models is displayed.
+
+```{r warning=FALSE, message=FALSE}
+#Two models with three factors.
+
+#Model 1: factor analysis is performed in a polychoric correlation matrix.
+modelo1<-fa(poly_cor,
+            nfactors = 3,
+            rotate = "none",
+            fm="mle") #maximum-likelihood method
+#It is specified that three factors are extracted, and no rotation is applied to them. The maximum likelihood method is used for the estimation of these factors.
+
+#Model 2.
+modelo2<-fa(poly_cor,
+            nfactors = 3,
+            rotate = "none",
+            fm="minres") #minimal residual model
+#The second model is analogous to the previous one, except for the last command, where the estimation of the factors is done using the minimum residuals model.
+
+#Outputs of these models: factor weight matrices, etc. Blank entries represent null loadings.
+print("Modelo 1: mle")
+modelo1$loadings
+print("Modelo 2: minres")
+modelo2$loadings
+```
+
+Finally, a comparison of the communalities of these two methods is illustrated. It appears that communalities of the likelihood model (first column) are greater than those of the minimum residual model (second column).
+
+```{r warning=FALSE, message=FALSE}
+#Comparison of the communalities.
+sort(modelo1$communality,decreasing = T)->c1
+sort(modelo2$communality,decreasing = T)->c2
+head(cbind(c1,c2))
+
+#Comparison of uniqueness, that is, the proportion of variance that has not been explained by the factor (1-communality).
+sort(modelo1$uniquenesses,decreasing = T)->u1
+sort(modelo2$uniquenesses,decreasing = T)->u2
+head(cbind(u1,u2),n=10)
+
+```
+
+## Appropriate number of latent factors
+
+There are different criteria, among which the **Scree plot** (Cattel 1966) and **parallel analysis** (Horn 1965) stand out. According to the following graphical outputs, **3** is considered to be the **optimal number of factors** (parallel analysis), despite **6** are the appropriate according to the first graphical scree plot.
+
+```{r warning=FALSE, message=FALSE}
+#Scree plot.
+scree(poly_cor)
+```
+
+It is observed that there is y=1 in the plot as a reference line for random variance. Eigenvalues of the correlation matrix that are above it explain more variance than expected by chance. Therefore, according to this Scree plot, 6 would be taken as the optimal number of factors.
+
+
+```{r warning=FALSE, message=FALSE}
+#Parallel analysis.
+fa.parallel(poly_cor,n.obs=100,fa="fa",fm="ml")
+```
+
+In this plot, the real data and simulated data with the model are represented by blue and red lines, respectively. It is observed that there are clearly 3 eigenvalues of the principal factors above the plot of simulated data. This indicates that 3 would be considered as the optimal number of factors.
+
+## Estimation of the factorial model
+
+The factorial model with 5 factors implementing a varimax rotation to seek a simpler interpretation is performed.
+
+```{r warning=FALSE, message=FALSE}
+modelo_varimax<-fa(poly_cor,nfactors = 5,rotate = "varimax",
+                   fa="mle")
+
+#The rotated factorial matrix is shown.
+print(modelo_varimax$loadings,cut=0) 
+```
+
+The following diagrammatic representation is used to illustrate with which variables each of the factors is correlated.
+
+```{r warning=FALSE, message=FALSE}
+fa.diagram(modelo_varimax,space=15)
+```
+
+Another way to do the previous analysis.
+
+```{r warning=FALSE, message=FALSE}
+#This function only performs the mle method (maximum-likelihood estimator method).
+FA<-factanal(expect_num,factors=5, rotation="varimax")
+FA$loadings
+```
+
+It is observed that the code provides the factor loadings, indicating the relationships between the original variables and the extracted factors. The closer to 1 or -1, the stronger the relationship, and the closer to 0, the weaker. Additionally, if the number is positive, it indicates a direct relationship, and if negative, an inverse one.
+
+
+# **Linear Discriminant Analysis (LDA)**
+
+The dataset contains information on various social indicators measured in different countries, including the country's life expectancy indicator. Therefore, it would be interesting to provide a classification method for the lifespan based on the other indicators. To do this, a qualitative variable is defined, which will be the response variable for the classification, called 'life.' This variable has two categories:
+
+- Long life: if it is greater than the mean.
+- Short life: if it is below the mean.
+
+```{r warning=FALSE, message=FALSE}
+life=c()
+mean = mean(data$Life.expectancy)
+
+for(k in 1:nrow(data)){
+  if(data$Life.expectancy[k]<mean){
+  life[k] = "short"
+  }
+  else
+    life[k] = "long"
+}
+
+life<-as.factor(life)
+```
+
+## Graphical exploration of data
+
+First, we explore how well (or poorly) each of the explanatory variables considered independently classifies the life expectancy. To do this, we draw the superimposed histograms. If the histograms are separated, the variable considered would be a good individual classifier for the species.
+
+```{r warning=FALSE, message=FALSE}
+#Create individual plots for each variable.
+p1 <- ggplot(data = data, aes(x = Year, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Year")
+
+p2 <- ggplot(data = data, aes(x = Adult.Mortality, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Adult.Mortality")
+
+p3 <- ggplot(data = data, aes(x = infant.deaths, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of infant.deaths")
+
+p4 <- ggplot(data = data, aes(x = Alcohol, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Alcohol")
+
+p5 <- ggplot(data = data, aes(x = percentage.expenditure, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of percentage.expenditure")
+
+p6 <- ggplot(data = data, aes(x = Hepatitis.B, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Hepatitis.B")
+
+p7 <- ggplot(data = data, aes(x = Measles, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Measles")
+
+p8 <- ggplot(data = data, aes(x = BMI, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of BMI")
+
+p9 <- ggplot(data = data, aes(x = under.five.deaths, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of under.five.deaths")
+
+p10 <- ggplot(data = data, aes(x = Polio, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Polio")
+
+p11<- ggplot(data = data, aes(x = Total.expenditure, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Total.expenditure")
+
+p12 <- ggplot(data = data, aes(x = Diphtheria, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Diphtheria")
+
+p13 <- ggplot(data = data, aes(x = HIV.AIDS, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of HIV.AIDS")
+
+p14 <- ggplot(data = data, aes(x = GDP, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of GDP")
+
+p15<- ggplot(data = data, aes(x = Population, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Population")
+
+p16<- ggplot(data = data, aes(x = thinness..1.19.years , fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of thinness..1.19.years")
+
+p17<- ggplot(data = data, aes(x = thinness.5.9.years, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of thinness.5.9.years")
+
+p18<- ggplot(data = data, aes(x = Resource.Income, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Resource.Income")
+
+p19<- ggplot(data = data, aes(x = Schooling, fill = life)) +
+  geom_histogram(position = "identity", alpha = 0.5) +
+  labs(title = "Histogram of Schooling")
+
+p1;p2;p3;p4;p5;p6;p7;p8;p9;p10;p11;p12;p13;p14;p15;p16;p17;p18;p19
+
+```
+
+
+The variable *Schooling* is the one that best differentiates between long and short lifespan (least overlapping).
+
+## Univariate and multivariate normality
+
+Next we make a graphical exploration of the normality of the univariate distributions of our predictors by representing the histograms and performing a *Saphiro test*.
+
+**Univariate histograms**
+
+```{r warning=FALSE, message=FALSE}
+# Histogram representation of each variable.
+par(mfcol = c(2, 2))
+
+# Loop through selected variables
+for (variable in 1:20) {
+  # Create a histogram
+  hist_data <- data[[variable]]
+  hist(hist_data, probability = TRUE, col = grey(0.8), main = paste("Histogram of", variable), xlab = variable)
+
+  # Overlay a normality curve
+  curve(dnorm(x, mean = mean(hist_data), sd = sd(hist_data)), col = "blue", lwd = 2, add = TRUE)
+}
+
+# Reset the layout to default
+par(mfcol = c(1, 1))
+
+```
+
+**Qqplots**
+
+```{r warning=FALSE, message=FALSE}
+par(mfrow=c(2,2))
+for (k in 1:19) {
+  j0 <- names(data)[k]
+  x0 <- seq(min(data[, k]), max(data[, k]), le = 50)
+  for (i in 1:2) {
+    i0 <- levels(life)[i]
+    x <- data[life == i0, j0]
+    qqnorm(x, main = paste("life expectancy", i0, j0), pch = 19, col = i + 1)
+    qqline(x)
+  }
+}
+```
+
+Based on the graphical techniques employed, it is evident that we will not achieve univariate normality in our variables.
+
+**Univariate normality test (Shapiro-Wilks)**
+
+The null hypothesis that the data follow a univariate normal distribution is tested. This hypothesis is rejected if the p-value given by the Shapiro-Wilks test is lesser than 0.05. Otherwise the assumption of normality of the data is not rejected.
+
+```{r warning=FALSE, message=FALSE}
+datos1<- data
+datos1[,2]=life
+datos_tidy <- melt(datos1, value.name = "value")
+
+result <- aggregate(value ~ Life.expectancy + variable, data = datos_tidy,
+                    FUN = function(x) shapiro.test(x)$p.value)
+result
+```
+
+The hypothesis of normality is rejected as the p-value given by the Shapiro-Wilks test is lesser than 0.05.
+
+## Multivariate normality
+
+We encounter trouble as the MVN function can only be used with less than 2000 observations and we have more. An *Energy Test* is another statistical test that determines whether or not a group of variables follows a multivariate normal distribution. The null and alternative hypotheses for the test are as follows:
+
+- H0 (null): The variables follow a multivariate normal distribution.
+
+- Ha (alternative): The variables do not follow a multivariate normal distribution.
+
+```{r warning=FALSE, message=FALSE}
+#Perform the Henze-Zirkler Multivariate Normality Test
+mvnorm.etest(data, R=100)
+```
+
+Given that our p-value < 0.05, we'll reject the null hypothesis. Therefore, we have evidence to suggest that the variables in the dataset do not follow a multivariate normal distribution. We can also use the following code:
+
+```{r warning=FALSE, message=FALSE}
+hz_test <- mvn(data = data, mvnTest = "hz")
+hz_test$multivariateNormality
+```
+
+
+##  Homogeneity of variance
+
+When there is a single predictor the most recommended test is the Barttlet test.When multiple predictors are used, it must be verified that the covariance matrix is constant in all groups. In this case it is also advisable to check the homogeneity of the variance for each predictor at the individual level. 
+
+The most recommended test is the *Box M test*, which is an extension of the *Barttlet test* for multivariate scenarios. It must be taken into account that it is very sensitive to whether the data are actually distributed according to a multivariate normal. For this reason, it is recommended to use a significance p-value < 0.001 to reject the null hypothesis.
+
+The null hypothesis to be tested is that of equality of covariance matrices in all groups.
+
+```{r warning=FALSE, message=FALSE}
+datos<- data[,-2]
+boxM(data = data[, 1:length(datos)], grouping = life)
+```
+
+In this case we do  reject the null hypothesis since p-value < 0.001 and therefore we can't assume homogeneity of variances.
+
+It is important to remember that for this conclusion to be reliable the assumption of multivariate normality must be met, which, wasn't the case. In fact, when there is no multivariate normal distribution, this test always comes out significant and therefore is not reliable.
+
+## Discriminant function
+
+Now we fit a linear discriminant classification model, but we'll have to keep in mind that the assumptions of multivariate normality and homogeneity of variance aren't satisfied.
+
+```{r warning=FALSE, message=FALSE}
+modelo_lda <- lda(formula = life ~ Year + Adult.Mortality + infant.deaths + Alcohol + percentage.expenditure+ Hepatitis.B + Measles + BMI + under.five.deaths+ Polio + Total.expenditure  + Diphtheria + HIV.AIDS + GDP + Population + thinness..1.19.years + thinness.5.9.years + Resource.Income + Schooling ,data = data)
+
+modelo_lda
+```
+
+The output of this object shows us the prior probabilities of each group, in this case 0.5707965 and 0.4292035 for long and short, respectively, the means of each regressor per group and the coefficients of the linear discriminant classification model, which in this case would have the form:
+
+odds = 1.132738e-02Year+ 4.340997e-03Adult.Mortality - 1.262522e-02infant.deaths - 1.970419e-02Alcohol - 9.283862e-04percentage.expenditure - 1.582141e-02Hepatitis.B - 2.458324e-03Measles - 4.536101e-03BMI - 1.064769e-03under.five.deaths - 3.381613e-03Polio - 3.877981e-02Total.expenditure - 3.881977e-03Diphtheria + 5.853773e+00HIV.AIDS - 1.935186e-05GDP - 1.312976e-08Population - 8.493223e-02thinness..1.19.years + 1.001592e-01thinness.5.9.years - 4.656544e+00Resource.Income - 6.379008e-02Schooling
+
+Once the classifier is built, we can classify new data based on its measurements by simply calling the predict function.
+
+## Model validation
+
+The *confusionmatrix* function from the *biotools* package performs cross-validation of the classification model.
+
+```{r warning=FALSE, message=FALSE}
+pred <- predict(modelo_lda, dimen = 1)
+confusionmatrix(life, pred$class)
+
+#Percentage of classification errors
+trainig_error <- mean(life != pred$class) * 100
+paste("trainig_error=", trainig_error, "%")
+
+```
+
+In this case the correct classifications rate is 89,11% approximately.
+
+
+## Displaying rankings
+
+From a geometric point of view, linear discriminant analysis separates space using a straight line. In this sense, the *partimat* function of the *klaR* package allows us to represent the classification limits of a linear or quadratic discriminant model for each pair of predictors. Each color represents a classification region according to the model, the centroid of each region and the real value of the observations are shown.
+
+```{r warning=FALSE, message=FALSE}
+partimat(life ~ Year + Adult.Mortality + infant.deaths + Alcohol + percentage.expenditure+ Hepatitis.B + Measles + BMI + under.five.deaths+ Polio + Total.expenditure  + Diphtheria + HIV.AIDS + GDP + Population + thinness..1.19.years + thinness.5.9.years + Resource.Income + Schooling,
+         data = data, method = "lda", prec = 200,
+         image.colors = c("green", "orange"),
+         col.mean = "yellow",nplots.vert = 1, nplots.hor=3)
+```
+
+
+Unlike the classification with the explanatory variables, which has an error of 10.89176%, when considering the classification according to each pair of variables, larger errors are made, from 0.106 to 0.429. The error rate has the majority values in the rank 0.17 and 0.3.
+
+In view of the graphs, it is observed that the pair of predictors that best classifies the data is Adult.Mortality and Resource.Income. If a classification model with two predictors were to be built, this pair would be considered.
+
+
+# **Quadratic Discriminant Analysis (QDA)**
+
+Just like for Linear Discriminant Analysis, to perform Quadratic Discriminant Analysis, we start with the graphical exploration of data and checks on univariate and multivariate normality and homogeneity of variances, which have already been conducted earlier.
+
+## Discriminant function
+
+Although the assumption of multivariate normality is not met, considering that variances are not homogeneous, a quadratic discriminant model is fitted because it is robust against the lack of this assumption. However, it should be noted, given the possibility of obtaining unexpected results.
+
+```{r warning=FALSE, message=FALSE}
+modelo_qda<- qda(formula = life ~ Year + Adult.Mortality + infant.deaths + Alcohol + percentage.expenditure+ Hepatitis.B + Measles + BMI + under.five.deaths+ Polio + Total.expenditure  + Diphtheria + HIV.AIDS + GDP + Population + thinness..1.19.years + thinness.5.9.years + Resource.Income + Schooling,data = data)
+modelo_qda
+```
+
+The output of this object shows us the prior probabilities of each group, in this case 0.5707965 and 0.4292035 and the means of each regressor per group.
+
+Once the classifier is built, we can classify new data based on its measurements by simply calling the predict function.
+
+## Validación cruzada
+
+The *confusionmatrix* function from the *biotools* package performs cross-validation of the classification model.
+
+```{r warning=FALSE, message=FALSE}
+pred <- predict(modelo_qda, dimen = 1)
+confusionmatrix(life, pred$class)
+
+trainig_error <- mean(life != pred$class) * 100
+paste("trainig_error=", trainig_error, "%")
+```
+
+In this case the correct classifications rate is 89.56% approximately, a little over the LDA case.
+
+
+## Displaying rankings
+
+The *partimat* function of the *klaR* package allows us to represent the classification limits of a linear or quadratic discriminant model for each pair of predictors. Each color represents a classification region according to the model, the centroid of each region and the real value of the observations are shown.
+
+```{r warning=FALSE, message=FALSE}
+partimat(life ~ Year + Adult.Mortality + infant.deaths + Alcohol + percentage.expenditure+ Hepatitis.B + Measles + BMI + under.five.deaths+ Polio + Total.expenditure  + Diphtheria + HIV.AIDS + GDP + Population + thinness..1.19.years + thinness.5.9.years + Resource.Income + Schooling,
+         data = expect_num, method = "qda", prec = 200,
+         image.colors = c("darkgoldenrod1", "snow2"),
+         col.mean = "firebrick",nplots.vert =1, nplots.hor=3)
+```
